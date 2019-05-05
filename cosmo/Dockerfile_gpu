@@ -233,6 +233,8 @@ RUN cd /usr/local/cosmo/cosmo && \
     export DYCORE_DIR=/usr/local/cosmo/dycore_gpu && \
     make -j$(nproc) CPP_DYCORE=1
 
+USER 666
+
 ENV COSMO_HOME=/usr/local/cosmo
 ENV PATH=$PATH:/usr/local/cosmo/cosmo/
 WORKDIR /data
