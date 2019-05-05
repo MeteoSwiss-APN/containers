@@ -1,0 +1,228 @@
+# 
+# HPC COSMO image
+# 
+# Contents:
+#   CUDA version 10.0
+#   HDF5 version 1.10.1
+#   Mellanox OFED version 
+#   OpenMPI version 3.0.0
+#   PGI compilers version 19.4
+#   Python 2 and 3 (upstream)
+# 
+
+FROM nvidia/cuda:10.0-devel-ubuntu18.04 AS devel
+
+# Python
+RUN apt-get update -y && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        python \
+        python3 vim && \
+    rm -rf /var/lib/apt/lists/*
+
+# PGI compiler version 19.4
+RUN apt-get update -y && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        gcc \
+        g++ \
+        libnuma1 \
+        perl \
+        wget && \
+    rm -rf /var/lib/apt/lists/*
+RUN mkdir -p /var/tmp && wget -q -nc --no-check-certificate -O /var/tmp/pgi-community-linux-x64-latest.tar.gz --referer https://www.pgroup.com/products/community.htm?utm_source=hpccm\&utm_medium=wgt\&utm_campaign=CE\&nvid=nv-int-14-39155 -P /var/tmp https://www.pgroup.com/support/downloader.php?file=pgi-community-linux-x64 && echo "DD" && \
+    mkdir -p /var/tmp/pgi && tar -x -f /var/tmp/pgi-community-linux-x64-latest.tar.gz -C /var/tmp/pgi -z && echo "AA" && \
+    cd /var/tmp/pgi && PGI_ACCEPT_EULA=accept PGI_INSTALL_DIR=/opt/pgi PGI_INSTALL_MPI=false PGI_INSTALL_NVIDIA=true PGI_MPI_GPU_SUPPORT=false PGI_SILENT=true ./install && echo "BB" && \
+    echo "variable LIBRARY_PATH is environment(LIBRARY_PATH);" >> /opt/pgi/linux86-64/19.4/bin/siterc && \
+    echo "variable library_path is default(\$if(\$LIBRARY_PATH,\$foreach(ll,\$replace(\$LIBRARY_PATH,":",), -L\$ll)));" >> /opt/pgi/linux86-64/19.4/bin/siterc && \
+    echo "append LDLIBARGS=\$library_path;" >> /opt/pgi/linux86-64/19.4/bin/siterc && \
+    rm -rf /var/tmp/pgi-community-linux-x64-latest.tar.gz /var/tmp/pgi
+
+ENV LD_LIBRARY_PATH=/opt/pgi/linux86-64/19.4/lib:$LD_LIBRARY_PATH \
+    PATH=/opt/pgi/linux86-64/19.4/bin:$PATH
+
+# Mellanox OFED version 4.5-1.0.1.0
+RUN apt-get update -y && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        libnl-3-200 \
+        libnl-route-3-200 \
+        libnuma1 \
+        wget && \
+    rm -rf /var/lib/apt/lists/*
+RUN mkdir -p /var/tmp && wget -q -nc --no-check-certificate -P /var/tmp http://content.mellanox.com/ofed/MLNX_OFED-4.5-1.0.1.0/MLNX_OFED_LINUX-4.5-1.0.1.0-ubuntu18.04-x86_64.tgz && \
+    mkdir -p /var/tmp && tar -x -f /var/tmp/MLNX_OFED_LINUX-4.5-1.0.1.0-ubuntu18.04-x86_64.tgz -C /var/tmp -z && \
+    dpkg --install /var/tmp/MLNX_OFED_LINUX-4.5-1.0.1.0-ubuntu18.04-x86_64/DEBS/libibverbs1_*_amd64.deb /var/tmp/MLNX_OFED_LINUX-4.5-1.0.1.0-ubuntu18.04-x86_64/DEBS/libibverbs-dev_*_amd64.deb /var/tmp/MLNX_OFED_LINUX-4.5-1.0.1.0-ubuntu18.04-x86_64/DEBS/ibverbs-utils_*_amd64.deb /var/tmp/MLNX_OFED_LINUX-4.5-1.0.1.0-ubuntu18.04-x86_64/DEBS/libibmad_*_amd64.deb /var/tmp/MLNX_OFED_LINUX-4.5-1.0.1.0-ubuntu18.04-x86_64/DEBS/libibmad-devel_*_amd64.deb /var/tmp/MLNX_OFED_LINUX-4.5-1.0.1.0-ubuntu18.04-x86_64/DEBS/libibumad_*_amd64.deb /var/tmp/MLNX_OFED_LINUX-4.5-1.0.1.0-ubuntu18.04-x86_64/DEBS/libibumad-devel_*_amd64.deb /var/tmp/MLNX_OFED_LINUX-4.5-1.0.1.0-ubuntu18.04-x86_64/DEBS/libmlx4-1_*_amd64.deb /var/tmp/MLNX_OFED_LINUX-4.5-1.0.1.0-ubuntu18.04-x86_64/DEBS/libmlx4-dev_*_amd64.deb /var/tmp/MLNX_OFED_LINUX-4.5-1.0.1.0-ubuntu18.04-x86_64/DEBS/libmlx5-1_*_amd64.deb /var/tmp/MLNX_OFED_LINUX-4.5-1.0.1.0-ubuntu18.04-x86_64/DEBS/libmlx5-dev_*_amd64.deb /var/tmp/MLNX_OFED_LINUX-4.5-1.0.1.0-ubuntu18.04-x86_64/DEBS/librdmacm-dev_*_amd64.deb /var/tmp/MLNX_OFED_LINUX-4.5-1.0.1.0-ubuntu18.04-x86_64/DEBS/librdmacm1_*_amd64.deb && \
+    rm -rf /var/tmp/MLNX_OFED_LINUX-4.5-1.0.1.0-ubuntu18.04-x86_64.tgz /var/tmp/MLNX_OFED_LINUX-4.5-1.0.1.0-ubuntu18.04-x86_64
+
+# OpenMPI version 3.0.0
+RUN apt-get update -y && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        bzip2 \
+        file \
+        hwloc \
+        libnuma-dev \
+        make \
+        openssh-client \
+        perl \
+        tar \
+        wget && \
+    rm -rf /var/lib/apt/lists/*
+RUN mkdir -p /var/tmp && wget -q -nc --no-check-certificate -P /var/tmp https://www.open-mpi.org/software/ompi/v3.0/downloads/openmpi-3.0.0.tar.bz2 && \
+    mkdir -p /var/tmp && tar -x -f /var/tmp/openmpi-3.0.0.tar.bz2 -C /var/tmp -j && \
+    cd /var/tmp/openmpi-3.0.0 &&  CC=pgcc CXX=pgc++ F77=pgfortran F90=pgfortran FC=pgfortran ./configure --prefix=/usr/local/openmpi --disable-getpwuid --enable-orterun-prefix-by-default --with-cuda=/usr/local/cuda --with-verbs && \
+    make -j$(nproc) && \
+    make -j$(nproc) install && \
+    rm -rf /var/tmp/openmpi-3.0.0.tar.bz2 /var/tmp/openmpi-3.0.0
+ENV LD_LIBRARY_PATH=/usr/local/openmpi/lib:$LD_LIBRARY_PATH \
+    PATH=/usr/local/openmpi/bin:$PATH
+
+# CMake version 3.12.3
+RUN apt-get update -y && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        wget && \
+    rm -rf /var/lib/apt/lists/*
+RUN mkdir -p /var/tmp && wget -q -nc --no-check-certificate -P /var/tmp https://cmake.org/files/v3.12/cmake-3.12.3-Linux-x86_64.sh && \
+    /bin/sh /var/tmp/cmake-3.12.3-Linux-x86_64.sh --prefix=/usr/local --skip-license && \
+    rm -rf /var/tmp/cmake-3.12.3-Linux-x86_64.sh
+
+# HDF5 version 1.10.1
+RUN apt-get update -y && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        bzip2 \
+        file \
+        make \
+        wget \
+        zlib1g-dev && \
+    rm -rf /var/lib/apt/lists/*
+RUN mkdir -p /var/tmp && wget -q -nc --no-check-certificate -P /var/tmp http://www.hdfgroup.org/ftp/HDF5/releases/hdf5-1.10/hdf5-1.10.1/src/hdf5-1.10.1.tar.bz2 && \
+    mkdir -p /var/tmp && tar -x -f /var/tmp/hdf5-1.10.1.tar.bz2 -C /var/tmp -j && \
+    cd /var/tmp/hdf5-1.10.1 &&  CC=pgcc CXX=pgc++ F77=pgfortran F90=pgfortran FC=pgfortran ./configure --prefix=/usr/local/hdf5 --enable-cxx --enable-fortran && \
+    make -j$(nproc) && \
+    make -j$(nproc) install && \
+    rm -rf /var/tmp/hdf5-1.10.1.tar.bz2 /var/tmp/hdf5-1.10.1
+ENV HDF5_DIR=/usr/local/hdf5 \
+    LD_LIBRARY_PATH=/usr/local/hdf5/lib:$LD_LIBRARY_PATH \
+    PATH=/usr/local/hdf5/bin:$PATH
+
+# NetCDF version 4.6.1, NetCDF C++ version 4.3.0, NetCDF Fortran
+# version 4.4.4
+RUN apt-get update -y && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        ca-certificates \
+        file \
+        libcurl4-openssl-dev \
+        m4 \
+        make \
+        wget \
+        zlib1g-dev && \
+    rm -rf /var/lib/apt/lists/*
+RUN mkdir -p /var/tmp && wget -q -nc --no-check-certificate -P /var/tmp https://www.unidata.ucar.edu/downloads/netcdf/ftp/netcdf-4.6.1.tar.gz && \
+    mkdir -p /var/tmp && tar -x -f /var/tmp/netcdf-4.6.1.tar.gz -C /var/tmp -z && \
+    cd /var/tmp/netcdf-4.6.1 &&  CC=pgcc CPPFLAGS=-I/usr/local/hdf5/include CXX=pgc++ F77=pgfortran F90=pgfortran FC=pgfortran LDFLAGS=-L/usr/local/hdf5/lib ./configure --prefix=/usr/local/netcdf && \
+    make -j$(nproc) && \
+    make -j$(nproc) install && \
+    rm -rf /var/tmp/netcdf-4.6.1.tar.gz /var/tmp/netcdf-4.6.1 && \
+    mkdir -p /var/tmp && wget -q -nc --no-check-certificate -P /var/tmp https://www.unidata.ucar.edu/downloads/netcdf/ftp/netcdf-cxx4-4.3.0.tar.gz && \
+    mkdir -p /var/tmp && tar -x -f /var/tmp/netcdf-cxx4-4.3.0.tar.gz -C /var/tmp -z && \
+    cd /var/tmp/netcdf-cxx4-4.3.0 &&  CC=pgcc CPPFLAGS=-I/usr/local/netcdf/include CXX=pgc++ F77=pgfortran F90=pgfortran FC=pgfortran LD_LIBRARY_PATH='/usr/local/netcdf/lib:$LD_LIBRARY_PATH' LDFLAGS=-L/usr/local/netcdf/lib ./configure --prefix=/usr/local/netcdf && \
+    make -j$(nproc) && \
+    make -j$(nproc) install && \
+    rm -rf /var/tmp/netcdf-cxx4-4.3.0.tar.gz /var/tmp/netcdf-cxx4-4.3.0 && \
+    mkdir -p /var/tmp && wget -q -nc --no-check-certificate -P /var/tmp https://www.unidata.ucar.edu/downloads/netcdf/ftp/netcdf-fortran-4.4.4.tar.gz && \
+    mkdir -p /var/tmp && tar -x -f /var/tmp/netcdf-fortran-4.4.4.tar.gz -C /var/tmp -z && \
+    cd /var/tmp/netcdf-fortran-4.4.4 &&  CC=pgcc CPPFLAGS=-I/usr/local/netcdf/include CXX=pgc++ F77=pgfortran F90=pgfortran FC=pgfortran LD_LIBRARY_PATH='/usr/local/netcdf/lib:$LD_LIBRARY_PATH' LDFLAGS=-L/usr/local/netcdf/lib ./configure --prefix=/usr/local/netcdf && \
+    make -j$(nproc) && \
+    make -j$(nproc) install && \
+    rm -rf /var/tmp/netcdf-fortran-4.4.4.tar.gz /var/tmp/netcdf-fortran-4.4.4
+ENV LD_LIBRARY_PATH=/usr/local/netcdf/lib:$LD_LIBRARY_PATH \
+    PATH=/usr/local/netcdf/bin:$PATH
+
+# Boost version 1.67.0
+RUN apt-get update -y && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        bzip2 \
+        libbz2-dev \
+        tar \
+        wget \
+        zlib1g-dev && \
+    rm -rf /var/lib/apt/lists/*
+RUN mkdir -p /var/tmp && wget -q -nc --no-check-certificate -P /var/tmp https://dl.bintray.com/boostorg/release/1.67.0/source/boost_1_67_0.tar.bz2 && \
+    mkdir -p /var/tmp && tar -x -f /var/tmp/boost_1_67_0.tar.bz2 -C /var/tmp -j && \
+#    cd /var/tmp/boost_1_67_0 && ./bootstrap.sh --prefix=/usr/local/boost --without-libraries=python && \
+#    ./b2 -j$(nproc) -q install && \
+#    rm -rf /var/tmp/boost_1_67_0.tar.bz2 /var/tmp/boost_1_67_0
+    cp -r /var/tmp/boost_1_67_0/ /usr/local/boost/ 
+ENV LD_LIBRARY_PATH=/usr/local/boost/lib:$LD_LIBRARY_PATH
+
+########### libgrib1 ##########
+
+COPY libgrib1/libgrib1_cosmo/ /usr/local/libgrib1
+RUN cd /usr/local/libgrib1/source && \
+    make -f Makefile.kesch.pgi -j3 && \
+    cp /usr/local/libgrib1/source/lib/lib* /usr/local/libgrib1/
+
+RUN cd /var/tmp && \
+    wget https://www.cpan.org/src/5.0/perl-5.16.3.tar.gz && \
+    tar xvf perl-5.16.3.tar.gz && \
+    cd perl-5.16.3 && \
+    sh Configure  -de && \
+    make -j$(nproc) && \
+    make install
+
+ENV PATH=/usr/local/bin/:$PATH
+
+RUN apt-get update -y && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        autoconf
+
+RUN cd /var/tmp && \
+    wget http://ftp.gnu.org/gnu/automake/automake-1.13.tar.gz && \
+    tar xvf automake-1.13.tar.gz && \
+    cd automake-1.13 && \
+    ./configure && \
+    make -j$(nproc) && \
+    make install 
+
+########### libgrib-api ##########
+
+
+COPY libgrib-api /var/tmp/libgrib-api
+RUN cd /var/tmp/libgrib-api && \
+    ./configure --build=x86_64 --host=x86_64 --prefix=/usr/local/libgrib_api/v1.20.0.2/pgi  --enable-static enable_shared=no --disable-jpeg && \
+    make install -j$(nproc) && \
+    echo 'export GRIB_DEFINITION_PATH=/usr/local/libgrib_api/v1.20.0.2/pgi/cosmo_definitions/definitions/:/usr/local/libgrib_api/v1.20.0.2/pgi/share/grib_api/definitions/\n \
+      export GRIB_SAMPLES_PATH=/usr/local/libgrib_api/v1.20.0.2/pgi/cosmo_definitions/samples/\n' \
+    >> /usr/local/libgrib_api/v1.20.0.2/pgi/configuration.sh
+
+COPY ./cosmo_definitions/ /usr/local/libgrib_api/v1.20.0.2/pgi/cosmo_definitions
+
+
+########### libjasper ##########
+
+COPY libjasper /var/tmp/libjasper
+RUN cd /var/tmp/libjasper && \
+    sed 's/<INSTALL_PREFIX>/\/usr\/local\/libjasper\//g' install.sh  -i  && \
+    ./install.sh
+
+COPY ./cosmo-pompa /usr/local/cosmo
+
+RUN cd /usr/local/cosmo && \
+    mkdir -p stella_cpu dycore_cpu
+
+RUN cd /usr/local/cosmo/stella && \
+    echo "MPI " $(which mpic++) && \
+    cmake . -DCMAKE_BUILD_TYPE=Release -DGCL=ON -DENABLE_OPENMP=OFF -DSINGLEPRECISION=ON -DSTELLA_KSIZE=60 -DSTELLA_KFLAT=12 -DCUDA_BACKEND=ON -DCUDA_COMPUTE_CAPABILITY=sm_60  -DCMAKE_INSTALL_PREFIX=../stella_cpu/ -DCMAKE_C_COMPILER=/usr/bin/gcc -DCMAKE_CXX_COMPILER=$(which g++) -DMPI_CXX_COMPILER=$(which mpic++) -DCUDA_cublas_LIBRARY="" -DCUDA_cublas_device_LIBRARY="" -DSTELLA_ENABLE_BENCHMARK=OFF -DSTELLA_ENABLE_TESTING=OFF -DSTELLA_ENABLE_SERIALIZATION=OFF -DBoost_DIR=/usr/local/boost/ -DBoost_INCLUDE_DIR=/usr/local/boost/ -DMPI_ROOT=$(which mpic++)/../../&& \
+    make -j$(nproc) VERBOSE=1 && \
+    make install
+
+RUN cd /usr/local/cosmo/dycore && \
+    cmake . -DCMAKE_BUILD_TYPE=Release -DCUDA_BACKEND=ON -DSTELLA_DIR=../stella_cpu -DCMAKE_INSTALL_PREFIX=../dycore_cpu -DDYCORE_UNITTEST=OFF -DCMAKE_C_COMPILER=/usr/bin/gcc -DCMAKE_CXX_COMPILER=/usr/bin/g++ -DCUDA_cublas_LIBRARY="" -DCUDA_cublas_device_LIBRARY=""  && \
+    make -j 12 && \
+    make install
+
+RUN cd /usr/local/cosmo/cosmo && \
+    cp Options.docker.pgi.gpu Options && \
+    export INSTALL_DIR=/usr/local && \
+    export STELLA_DIR=/usr/local/cosmo/stella_gpu && \
+    export DYCORE_DIR=/usr/local/cosmo/dycore_gpu && \
+    make -j$(nproc) CPP_DYCORE=1
+
+ENV COSMO_HOME=/usr/local/cosmo
