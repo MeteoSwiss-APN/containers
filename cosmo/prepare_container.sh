@@ -27,6 +27,10 @@ fi
 workdir=$PWD
 git clone --branch docker git@github.com:cosunae/cosmo-pompa.git
 cd cosmo-pompa
+cd cosmo/test/testsuite/data/
+bash get_data.sh
+cd ${workdir}/cosmo-pompa
+
 git clone git@github.com:MeteoSwiss-APN/stella.git
 cd $workdir
 
