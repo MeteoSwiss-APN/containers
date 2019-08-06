@@ -202,7 +202,7 @@ COPY ./cosmo_definitions/ /usr/local/libgrib_api/v1.20.0.2/pgi/cosmo_definitions
 
 COPY libjasper /var/tmp/libjasper
 RUN cd /var/tmp/libjasper && \
-    sed 's/<INSTALL_PREFIX>/\/usr\/local\/libjasper\//g' install.sh  -i  && \
+    export libjasper_install=/usr/local/libjasper/ && \
     ./install.sh
 
 COPY ./cosmo-pompa /usr/local/cosmo
