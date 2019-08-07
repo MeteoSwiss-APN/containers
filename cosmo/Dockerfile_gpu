@@ -202,7 +202,7 @@ COPY ./cosmo_definitions/ /usr/local/libgrib_api/v1.20.0.2/pgi/cosmo_definitions
 
 COPY libjasper /var/tmp/libjasper
 RUN cd /var/tmp/libjasper && \
-    sed 's/<INSTALL_PREFIX>/\/usr\/local\/libjasper\//g' install.sh  -i  && \
+    export libjasper_install=/usr/local/libjasper/ && \
     ./install.sh
 
 COPY ./cosmo-pompa /usr/local/cosmo
@@ -213,14 +213,16 @@ RUN cd /usr/local/cosmo && \
 
 RUN cd /usr/local/cosmo/stella && \
     echo "MPI " $(which mpic++) && \
-    cmake . -DCMAKE_BUILD_TYPE=Release -DGCL=ON -DENABLE_OPENMP=OFF -DSINGLEPRECISION=ON -DSTELLA_KSIZE=60 -DSTELLA_KFLAT=12 -DCUDA_BACKEND=ON -DCUDA_COMPUTE_CAPABILITY=sm_60  -DCMAKE_INSTALL_PREFIX=../stella_cpu/ -DCMAKE_C_COMPILER=/usr/bin/gcc -DCMAKE_CXX_COMPILER=$(which g++) -DMPI_CXX_COMPILER=$(which mpic++) -DCUDA_cublas_LIBRARY="" -DCUDA_cublas_device_LIBRARY="" -DSTELLA_ENABLE_BENCHMARK=OFF -DSTELLA_ENABLE_TESTING=OFF -DSTELLA_ENABLE_SERIALIZATION=OFF -DBoost_DIR=/usr/local/boost/ -DBoost_INCLUDE_DIR=/usr/local/boost/ -DMPI_ROOT=$(which mpic++)/../../&& \
+    mkdir build && cd build && \
+    cmake .. -DCMAKE_BUILD_TYPE=Release -DGCL=ON -DENABLE_OPENMP=OFF -DSINGLEPRECISION=ON -DSTELLA_KSIZE=60 -DSTELLA_KFLAT=12 -DCUDA_BACKEND=ON -DCUDA_COMPUTE_CAPABILITY=sm_60  -DCMAKE_INSTALL_PREFIX=/usr/local/cosmo/stella/install -DCMAKE_C_COMPILER=/usr/bin/gcc -DCMAKE_CXX_COMPILER=$(which g++) -DMPI_CXX_COMPILER=$(which mpic++) -DCUDA_cublas_LIBRARY="" -DCUDA_cublas_device_LIBRARY="" -DSTELLA_ENABLE_BENCHMARK=OFF -DSTELLA_ENABLE_TESTING=OFF -DSTELLA_ENABLE_SERIALIZATION=OFF -DBoost_DIR=/usr/local/boost/ -DBoost_INCLUDE_DIR=/usr/local/boost/ -DMPI_ROOT=$(which mpic++)/../../&& \
     make -j$(nproc) VERBOSE=1 && \
     make install
 
 # Dycore
 #
 RUN cd /usr/local/cosmo/dycore && \
-    cmake . -DCMAKE_BUILD_TYPE=Release -DCUDA_BACKEND=ON -DSTELLA_DIR=../stella_cpu -DCMAKE_INSTALL_PREFIX=../dycore_cpu -DDYCORE_UNITTEST=OFF -DCMAKE_C_COMPILER=/usr/bin/gcc -DCMAKE_CXX_COMPILER=/usr/bin/g++ -DCUDA_cublas_LIBRARY="" -DCUDA_cublas_device_LIBRARY=""  && \
+    mkdir build && cd build && \
+    cmake .. -DCMAKE_BUILD_TYPE=Release -DCUDA_BACKEND=ON -DSTELLA_DIR=/usr/local/cosmo/stella/install -DCMAKE_INSTALL_PREFIX=/usr/local/cosmo/dycore/install -DDYCORE_UNITTEST=OFF -DCMAKE_C_COMPILER=/usr/bin/gcc -DCMAKE_CXX_COMPILER=/usr/bin/g++ -DCUDA_cublas_LIBRARY="" -DCUDA_cublas_device_LIBRARY=""  && \
     make -j$(nproc) && \
     make install
 
@@ -229,12 +231,13 @@ RUN cd /usr/local/cosmo/dycore && \
 RUN cd /usr/local/cosmo/cosmo && \
     cp Options.docker.pgi.gpu Options && \
     export INSTALL_DIR=/usr/local && \
-    export STELLA_DIR=/usr/local/cosmo/stella_gpu && \
-    export DYCORE_DIR=/usr/local/cosmo/dycore_gpu && \
+    export STELLA_DIR=/usr/local/cosmo/stella/install && \
+    export DYCORE_DIR=/usr/local/cosmo/dycore/install && \
     make -j$(nproc) CPP_DYCORE=1
 
 USER 666
 
+ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/cuda-10.0/compat/
 ENV COSMO_HOME=/usr/local/cosmo
 ENV PATH=$PATH:/usr/local/cosmo/cosmo/
 WORKDIR /data
